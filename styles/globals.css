@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-900 text-slate-100 font-sans;
+}
+
+.card { @apply bg-white text-slate-900 rounded-lg shadow-md p-3 }
+
+/* Card face visuals and animations */
+.card-face {
+  background: linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);
+  border: 1px solid rgba(15,23,42,0.06);
+}
+
+@keyframes deal {
+  from { transform: translateY(-20px) rotate(-6deg); opacity: 0 }
+  to { transform: translateY(0) rotate(0); opacity: 1 }
+}
+
+.card-face { animation: deal 240ms ease both }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-face { animation: none }
+}
+
+/* Accessibility utilities */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0 }
+

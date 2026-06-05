@@ -1,0 +1,30 @@
+{
+  "name": "bhabhi-game",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"next dev\" \"node server/index.js\"",
+    "build": "next build",
+    "start": "next start",
+    "start:prod": "concurrently \"node server/index.js\" \"next start -p 3000\"",
+    "test": "jest"
+  },
+  "dependencies": {
+    "next": "13.4.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "socket.io-client": "4.7.2",
+    "express": "4.18.2",
+    "socket.io": "4.7.2",
+    "@socket.io/redis-adapter": "7.1.0",
+    "redis": "4.6.7",
+    "concurrently": "8.2.0",
+    "cors": "2.8.5"
+  },
+  "devDependencies": {
+    "autoprefixer": "10.4.14",
+    "postcss": "8.4.24",
+    "tailwindcss": "3.4.7",
+    "jest": "29.6.1"
+  }
+}
