@@ -45,6 +45,7 @@ app.get('/rooms', (req,res)=>{
 app.post('/rooms', (req,res)=>{
   const id = makeId()
   rooms[id] = { players: [], hands: {}, played: [], deck: [], started: false, current: 0 }
+  console.log('Created room', id)
   res.json({ id })
 })
 

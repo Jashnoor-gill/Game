@@ -5,6 +5,9 @@ import { getSocket } from '../lib/socket'
 export default function Home() {
   const [rooms, setRooms] = useState([])
   const [name, setName] = useState('Player')
+  const API = (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ? process.env.NEXT_PUBLIC_API_URL : 'http://localhost:3001'
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     const s = getSocket()
@@ -14,9 +17,21 @@ export default function Home() {
   }, [])
 
   const createRoom = async () => {
-    const res = await fetch('http://localhost:3001/rooms', { method: 'POST' })
-    const data = await res.json()
-    window.location.href = `/room/${data.id}?name=${encodeURIComponent(name)}`
+    setCreating(true)
+    setError(null)
+    console.log('Creating room via', API)
+    try{
+      const res = await fetch(`${API}/rooms`, { method: 'POST' })
+      if (!res.ok) throw new Error(`Server returned ${res.status}`)
+      const data = await res.json()
+      window.location.href = `/room/${data.id}?name=${encodeURIComponent(name)}`
+    }catch(err){
+      console.error('Create room failed', err)
+      setError(err.message)
+      alert('Create room failed: '+err.message)
+    }finally{
+      setCreating(false)
+    }
   }
 
   return (
@@ -26,7 +41,8 @@ export default function Home() {
         <div className="mb-4">Your name</div>
         <input value={name} onChange={e=>setName(e.target.value)} className="w-full p-2 rounded border" />
         <div className="flex gap-2 mt-4">
-          <button onClick={createRoom} className="px-4 py-2 bg-orange-500 text-white rounded">Create Room</button>
+          <button onClick={createRoom} disabled={creating} className="px-4 py-2 bg-orange-500 text-white rounded disabled:opacity-60">{creating? 'Creating…':'Create Room'}</button>
+          {error && <div className="text-red-400 text-sm mt-2">{error}</div>}
         </div>
       </div>
 
@@ -40,9 +56,7 @@ export default function Home() {
                 <div className="font-semibold">Room {r.id}</div>
                 <div className="text-sm text-slate-500">Players: {r.players.length}</div>
               </div>
-              <Link href={`/room/${r.id}?name=${encodeURIComponent(name)}`}>
-                <a className="px-3 py-1 bg-slate-800 text-white rounded">Join</a>
-              </Link>
+              <Link href={`/room/${r.id}?name=${encodeURIComponent(name)}`} className="px-3 py-1 bg-slate-800 text-white rounded">Join</Link>
             </div>
           ))}
         </div>
