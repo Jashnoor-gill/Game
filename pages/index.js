@@ -135,124 +135,180 @@ export default function Home() {
   const displayName = account?.username || name
 
   return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="max-w-6xl mx-auto grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
-          <section className="card">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <div className="min-h-screen px-4 py-5 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <section className="card-hero overflow-hidden relative">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.18),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.12),transparent_28%)] pointer-events-none" />
+          <div className="relative grid gap-6 lg:grid-cols-[1.2fr_0.8fr] p-6 md:p-8">
+            <div className="space-y-5">
+              <div className="flex flex-wrap gap-2">
+                <span className="seat-chip">Real-time multiplayer</span>
+                <span className="seat-chip">Tournaments</span>
+                <span className="seat-chip">Rankings</span>
+                <span className="seat-chip">Mobile ready</span>
+              </div>
               <div>
-                <p className="text-sm uppercase tracking-[0.25em] text-orange-300">Bhabhi Online</p>
-                <h1 className="text-4xl font-bold mt-2">Real-time rooms, tournaments, and rankings</h1>
-                <p className="text-slate-400 mt-3 max-w-2xl">
-                  Sign in to keep your own profile, create a tournament with a fixed participant limit, and track wins on the leaderboard.
+                <p className="text-xs uppercase tracking-[0.35em] text-orange-200/90">Bhabhi Online</p>
+                <h1 className="mt-3 text-4xl sm:text-5xl font-black leading-tight text-white max-w-2xl">
+                  A premium card-table experience for casual rooms, tournaments, and personal rankings.
+                </h1>
+                <p className="mt-4 text-slate-300 max-w-2xl text-base sm:text-lg leading-7">
+                  Sign in to keep your own account, launch a tournament with a participant cap, and follow the leaderboard in a UI that feels like a live table rather than a form app.
                 </p>
               </div>
-              <div className="rounded-2xl bg-slate-900/80 border border-white/10 p-4 min-w-[220px]">
-                <div className="text-sm text-slate-400">Current player</div>
-                <div className="text-xl font-semibold">{displayName}</div>
-                <div className="text-sm text-slate-400 mt-1">{account ? `Wins: ${account.wins} • Tournament points: ${account.tournamentPoints}` : 'Guest mode'}</div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="stat-tile">
+                  <div className="text-xs text-slate-400 uppercase tracking-[0.2em]">Current player</div>
+                  <div className="mt-2 text-xl font-semibold text-white">{displayName}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="text-xs text-slate-400 uppercase tracking-[0.2em]">Wins</div>
+                  <div className="mt-2 text-xl font-semibold text-emerald-300">{account ? account.wins : 'Guest'}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="text-xs text-slate-400 uppercase tracking-[0.2em]">Tournament points</div>
+                  <div className="mt-2 text-xl font-semibold text-orange-300">{account ? account.tournamentPoints : 0}</div>
+                </div>
               </div>
             </div>
-          </section>
 
-          <section className="grid gap-6 md:grid-cols-2">
-            <div className="card">
-              <h2 className="text-xl font-semibold mb-4">Account</h2>
+            <div className="space-y-4">
+              <div className="panel p-4 md:p-5">
+                <div className="text-sm text-slate-400">Account status</div>
+                <div className="mt-1 text-2xl font-bold text-white">{account ? 'Signed in' : 'Guest mode'}</div>
+                <div className="mt-3 text-sm text-slate-300 leading-6">
+                  {account ? 'Your profile, wins, and tournament ranking are tied to this account.' : 'Create an account to keep your own ranking and tournament history.'}
+                </div>
+              </div>
+              <div className="panel p-4 md:p-5">
+                <div className="text-sm text-slate-400">Lobby highlights</div>
+                <div className="mt-3 grid gap-2 text-sm text-slate-200">
+                  <div className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2"><span>Casual room</span><span className="text-orange-300">Instant play</span></div>
+                  <div className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2"><span>Tournament room</span><span className="text-emerald-300">Participant cap</span></div>
+                  <div className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2"><span>Ranking board</span><span className="text-sky-300">Wins + points</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-6">
+            <section className="card">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h2 className="text-xl font-semibold text-white">Account</h2>
+                <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Login options</span>
+              </div>
               <div className="grid gap-3">
                 <input
                   value={auth.username}
                   onChange={e => setAuth(prev => ({ ...prev, username: e.target.value }))}
                   placeholder="Username"
-                  className="w-full p-3 rounded-xl bg-slate-950/70 border border-white/10"
+                  className="w-full p-3 rounded-2xl bg-slate-950/70 border border-white/10 outline-none focus:ring-2 focus:ring-orange-400/70"
                 />
                 <input
                   value={auth.password}
                   onChange={e => setAuth(prev => ({ ...prev, password: e.target.value }))}
                   placeholder="Password"
                   type="password"
-                  className="w-full p-3 rounded-xl bg-slate-950/70 border border-white/10"
+                  className="w-full p-3 rounded-2xl bg-slate-950/70 border border-white/10 outline-none focus:ring-2 focus:ring-orange-400/70"
                 />
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => submitAuth('login')} disabled={authBusy} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-950 font-semibold disabled:opacity-60">{authBusy ? 'Working…' : 'Login'}</button>
-                  <button onClick={() => submitAuth('register')} disabled={authBusy} className="px-4 py-2 rounded-xl bg-orange-500 text-white font-semibold disabled:opacity-60">Create Account</button>
-                  {account && <button onClick={logout} className="px-4 py-2 rounded-xl bg-slate-800 text-white">Logout</button>}
+                  <button onClick={() => submitAuth('login')} disabled={authBusy} className="px-4 py-2 rounded-2xl bg-slate-100 text-slate-950 font-semibold disabled:opacity-60">{authBusy ? 'Working…' : 'Login'}</button>
+                  <button onClick={() => submitAuth('register')} disabled={authBusy} className="px-4 py-2 rounded-2xl bg-orange-500 text-white font-semibold disabled:opacity-60">Create Account</button>
+                  {account && <button onClick={logout} className="px-4 py-2 rounded-2xl bg-slate-800 text-white">Logout</button>}
                 </div>
-                {authError && <div className="text-red-400 text-sm">{authError}</div>}
+                {authError && <div className="text-red-300 text-sm">{authError}</div>}
               </div>
-            </div>
+            </section>
 
-            <div className="card">
-              <h2 className="text-xl font-semibold mb-4">Create Room</h2>
+            <section className="card">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h2 className="text-xl font-semibold text-white">Create room</h2>
+                <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Casual or tournament</span>
+              </div>
               <div className="space-y-3">
-                <input value={name} onChange={e=>setName(e.target.value)} className="w-full p-3 rounded-xl bg-slate-950/70 border border-white/10" />
-                <button onClick={createRoom} disabled={creatingRoom} className="w-full px-4 py-3 bg-orange-500 text-white rounded-xl font-semibold disabled:opacity-60">{creatingRoom ? 'Creating…' : 'Create Casual Room'}</button>
-                <button onClick={createTournament} disabled={creatingTournament} className="w-full px-4 py-3 bg-emerald-500 text-white rounded-xl font-semibold disabled:opacity-60">{creatingTournament ? 'Creating…' : 'Create Tournament'}</button>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input value={tournamentForm.name} onChange={e => setTournamentForm(prev => ({ ...prev, name: e.target.value }))} placeholder="Tournament name" className="w-full p-3 rounded-xl bg-slate-950/70 border border-white/10" />
-                  <input value={tournamentForm.maxPlayers} onChange={e => setTournamentForm(prev => ({ ...prev, maxPlayers: e.target.value }))} type="number" min="2" max="12" className="w-full p-3 rounded-xl bg-slate-950/70 border border-white/10" />
+                <input value={name} onChange={e=>setName(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-950/70 border border-white/10 outline-none focus:ring-2 focus:ring-orange-400/70" />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button onClick={createRoom} disabled={creatingRoom} className="px-4 py-3 bg-orange-500 text-white rounded-2xl font-semibold disabled:opacity-60">{creatingRoom ? 'Creating…' : 'Create Casual Room'}</button>
+                  <button onClick={createTournament} disabled={creatingTournament} className="px-4 py-3 bg-emerald-500 text-white rounded-2xl font-semibold disabled:opacity-60">{creatingTournament ? 'Creating…' : 'Create Tournament'}</button>
                 </div>
-                {roomError && <div className="text-red-400 text-sm">{roomError}</div>}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input value={tournamentForm.name} onChange={e => setTournamentForm(prev => ({ ...prev, name: e.target.value }))} placeholder="Tournament name" className="w-full p-3 rounded-2xl bg-slate-950/70 border border-white/10 outline-none focus:ring-2 focus:ring-emerald-400/70" />
+                  <input value={tournamentForm.maxPlayers} onChange={e => setTournamentForm(prev => ({ ...prev, maxPlayers: e.target.value }))} type="number" min="2" max="12" className="w-full p-3 rounded-2xl bg-slate-950/70 border border-white/10 outline-none focus:ring-2 focus:ring-emerald-400/70" />
+                </div>
+                {roomError && <div className="text-red-300 text-sm">{roomError}</div>}
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section className="card">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <h2 className="text-xl font-semibold">Active Rooms</h2>
-              <button onClick={refreshLists} className="text-sm px-3 py-2 rounded-lg bg-slate-800">Refresh</button>
-            </div>
-            <div className="grid gap-3">
-              {rooms.length===0 && <div className="text-slate-400">No active rooms</div>}
-              {rooms.map(room => (
-                <div key={room.id} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 flex items-center justify-between gap-4">
-                  <div>
-                    <div className="font-semibold">{room.mode === 'tournament' ? room.tournamentName || 'Tournament' : 'Room'} {room.id}</div>
-                    <div className="text-sm text-slate-400">
-                      {room.mode === 'tournament' ? `Tournament • ${room.players.length}/${room.maxPlayers} players` : `Players: ${room.players.length}`}
+            <section className="card">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Active rooms</h2>
+                  <p className="text-sm text-slate-400">Join a live table or jump into a tournament lobby.</p>
+                </div>
+                <button onClick={refreshLists} className="text-sm px-3 py-2 rounded-xl bg-white/5 border border-white/10">Refresh</button>
+              </div>
+              <div className="grid gap-3">
+                {rooms.length===0 && <div className="text-slate-400">No active rooms</div>}
+                {rooms.map(room => (
+                  <div key={room.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="font-semibold text-white">{room.mode === 'tournament' ? room.tournamentName || 'Tournament' : 'Room'} {room.id}</div>
+                      <div className="text-sm text-slate-400">
+                        {room.mode === 'tournament' ? `Tournament • ${room.players.length}/${room.maxPlayers} players` : `Players: ${room.players.length}`}
+                      </div>
+                    </div>
+                    <Link href={`/room/${room.id}?name=${encodeURIComponent(displayName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`} className="px-4 py-2 rounded-2xl bg-slate-100 text-slate-950 font-semibold">Join</Link>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <div className="space-y-6">
+            <section className="card">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">Leaderboard</h2>
+                <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Ranked by wins</span>
+              </div>
+              <div className="space-y-3">
+                {leaderboard.length === 0 && <div className="text-slate-400">No ranking data yet</div>}
+                {leaderboard.slice(0, 10).map((player, index) => (
+                  <div key={player.username} className="rounded-2xl bg-white/5 border border-white/10 p-3 flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-white">#{index + 1} {player.username}</div>
+                      <div className="text-xs text-slate-400">Games: {player.gamesPlayed} • Tournament wins: {player.tournamentWins}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-orange-300">Wins {player.wins}</div>
+                      <div className="text-xs text-slate-400">Points {player.tournamentPoints}</div>
                     </div>
                   </div>
-                  <Link href={`/room/${room.id}?name=${encodeURIComponent(displayName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-950 font-semibold">Join</Link>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+                ))}
+              </div>
+            </section>
 
-        <div className="space-y-6">
-          <section className="card">
-            <h2 className="text-xl font-semibold mb-4">Leaderboard</h2>
-            <div className="space-y-3">
-              {leaderboard.length === 0 && <div className="text-slate-400">No ranking data yet</div>}
-              {leaderboard.slice(0, 10).map((player, index) => (
-                <div key={player.username} className="rounded-xl bg-slate-950/60 border border-white/10 p-3 flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">#{index + 1} {player.username}</div>
-                    <div className="text-xs text-slate-400">Games: {player.gamesPlayed} • Tournament wins: {player.tournamentWins}</div>
+            <section className="card">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">Tournaments</h2>
+                <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Participant cap</span>
+              </div>
+              <div className="space-y-3">
+                {tournaments.length === 0 && <div className="text-slate-400">No active tournaments yet</div>}
+                {tournaments.map(tournament => (
+                  <div key={tournament.id} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                    <div className="font-semibold text-white">{tournament.tournamentName || tournament.id}</div>
+                    <div className="text-sm text-slate-400 mt-1">{tournament.players.length}/{tournament.maxPlayers} players</div>
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
+                      <Link href={`/room/${tournament.id}?name=${encodeURIComponent(displayName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`} className="px-3 py-2 rounded-xl bg-slate-100 text-slate-950 font-semibold">Open</Link>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm text-orange-300">Wins {player.wins}</div>
-                    <div className="text-xs text-slate-400">Points {player.tournamentPoints}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="card">
-            <h2 className="text-xl font-semibold mb-4">Tournaments</h2>
-            <div className="space-y-3">
-              {tournaments.length === 0 && <div className="text-slate-400">No active tournaments yet</div>}
-              {tournaments.map(tournament => (
-                <div key={tournament.id} className="rounded-xl bg-slate-950/60 border border-white/10 p-3">
-                  <div className="font-semibold">{tournament.tournamentName || tournament.id}</div>
-                  <div className="text-sm text-slate-400">{tournament.players.length}/{tournament.maxPlayers} players</div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <Link href={`/room/${tournament.id}?name=${encodeURIComponent(displayName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`} className="px-3 py-2 rounded-lg bg-slate-100 text-slate-950 font-semibold">Open</Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+          </div>
         </div>
       </div>
     </div>

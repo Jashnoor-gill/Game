@@ -107,6 +107,79 @@ function ensureRoom(roomId, options = {}){
   return rooms[roomId]
 }
 
+function getPlayersWithCards(room){
+  return room.players.filter(p => (room.hands[p.name] || []).length > 0)
+}
+
+function advanceCurrentToNextPlayer(room, fromIndex){
+  if (!room.players.length) return
+  let next = typeof fromIndex === 'number' ? fromIndex : room.current
+  for (let i = 0; i < room.players.length; i++){
+    next = (next + 1) % room.players.length
+    const player = room.players[next]
+    if ((room.hands[player.name] || []).length > 0){
+      room.current = next
+      return
+    }
+  }
+  room.current = 0
+}
+
+function endRoomIfOneLeft(room, roomId){
+  const remaining = getPlayersWithCards(room)
+  if (remaining.length <= 1){
+    room.bhabi = remaining.length === 1 ? remaining[0].name : null
+    recordFinishedRoom(room)
+    room.started = false
+    room.trick = { leadSuit: null, plays: [] }
+    io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
+    return true
+  }
+  return false
+}
+
+function removePlayerFromRoom(roomId, socketId, { declareLoser = false } = {}){
+  const room = rooms[roomId]
+  if (!room) return false
+  const idx = room.players.findIndex(p => p.id === socketId)
+  if (idx < 0) return false
+
+  const [player] = room.players.splice(idx, 1)
+  if (!player) return false
+
+  if (declareLoser && room.started){
+    room.hands[player.name] = []
+    if (!room.finishedOrder.includes(player.name)) room.finishedOrder.push(player.name)
+  }
+
+  delete room.hands[player.name]
+
+  if (!room.players.length){
+    delete rooms[roomId]
+    return true
+  }
+
+  room.players.forEach(p => {
+    p.count = room.hands[p.name]?.length || 0
+  })
+
+  if (room.started){
+    if (room.players[idx] && (room.hands[room.players[idx].name] || []).length > 0){
+      room.current = idx
+    } else if (room.current >= room.players.length){
+      room.current = 0
+    }
+    if (!endRoomIfOneLeft(room, roomId)){
+      advanceCurrentToNextPlayer(room, idx - 1)
+      io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
+    }
+    return true
+  }
+
+  io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
+  return true
+}
+
 function getRoomSummary(room){
   const standings = room.tournament
     ? Object.entries(room.tournament.standings).map(([username, stats]) => ({
@@ -269,6 +342,34 @@ io.on('connection', (socket)=>{
     io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
   })
 
+  socket.on('leaveRoom', ({ roomId })=>{
+    removePlayerFromRoom(roomId, socket.id)
+  })
+
+  socket.on('declareLoser', ({ roomId })=>{
+    const room = rooms[roomId]
+    if (!room) return
+    const player = room.players.find(p => p.id === socket.id)
+    if (!player) return
+
+    if (room.started){
+      room.hands[player.name] = []
+      if (!room.finishedOrder.includes(player.name)) room.finishedOrder.push(player.name)
+      room.players.forEach(p=> p.count = room.hands[p.name]?.length || 0)
+      if (!endRoomIfOneLeft(room, roomId)){
+        if (room.current >= room.players.length || room.players[room.current]?.name === player.name){
+          advanceCurrentToNextPlayer(room, room.current)
+        }
+        io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
+      }
+      return
+    }
+
+    room.finishedOrder = room.finishedOrder || []
+    if (!room.finishedOrder.includes(player.name)) room.finishedOrder.push(player.name)
+    io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
+  })
+
   socket.on('startGame', ({ roomId })=>{
     const room = rooms[roomId]
     if (!room) return
@@ -415,12 +516,7 @@ io.on('connection', (socket)=>{
   socket.on('disconnect', ()=>{
     // remove player from rooms
     for (const id of Object.keys(rooms)){
-      const r = rooms[id]
-      const idx = r.players.findIndex(p=>p.id===socket.id)
-      if (idx>=0){
-        r.players.splice(idx,1)
-        io.to(id).emit('room:update', { id, ...getRoomSummary(r) })
-      }
+      if (removePlayerFromRoom(id, socket.id)) return
     }
   })
 })
