@@ -282,7 +282,10 @@ io.on('connection', (socket)=>{
     room.hands = hands
     room.players.forEach(p=> p.count = room.hands[p.name].length)
     room.started = true
-    room.current = 0
+    room.openingCard = 'A♠'
+    room.openingCardPlayed = false
+    const openingPlayerIndex = room.players.findIndex(p => (room.hands[p.name] || []).includes('A♠'))
+    room.current = openingPlayerIndex >= 0 ? openingPlayerIndex : 0
     room.trick = { leadSuit: null, plays: [] }
     room.finishedOrder = []
     io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
@@ -306,6 +309,13 @@ io.on('connection', (socket)=>{
     // verify card exists in hand
     if (!room.hands[name] || !room.hands[name].includes(card)) return
 
+    if (!room.openingCardPlayed && room.trick?.plays?.length === 0){
+      if (card !== room.openingCard){
+        socket.emit('invalidPlay', { reason: 'Opening move must be Ace of Spades', card })
+        return
+      }
+    }
+
     // enforce follow-suit
     const trick = room.trick || { leadSuit: null, plays: [] }
     const leadSuit = trick.leadSuit
@@ -324,6 +334,7 @@ io.on('connection', (socket)=>{
     // remove card from hand and add to trick plays
     room.hands[name] = room.hands[name].filter(c=>c!==card)
     trick.plays.push({ name, card })
+    if (card === room.openingCard) room.openingCardPlayed = true
     room.trick = trick
     room.players.forEach(p=> p.count = room.hands[p.name]?.length || 0)
 
