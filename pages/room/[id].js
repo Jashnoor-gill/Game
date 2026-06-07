@@ -3,6 +3,21 @@ import { useRouter } from 'next/router'
 import { getSocket } from '../../lib/socket'
 import Card from '../../components/Card'
 
+const suitOrder = ['♣', '♦', '♥', '♠']
+const rankOrder = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+
+function sortHand(cards){
+  return [...cards].sort((left, right) => {
+    const leftSuit = suitOrder.indexOf(left.slice(-1))
+    const rightSuit = suitOrder.indexOf(right.slice(-1))
+    if (leftSuit !== rightSuit) return leftSuit - rightSuit
+
+    const leftRank = rankOrder.indexOf(left.slice(0, left.length - 1))
+    const rightRank = rankOrder.indexOf(right.slice(0, right.length - 1))
+    return leftRank - rightRank
+  })
+}
+
 export default function Room() {
   const router = useRouter()
   const { id } = router.query
@@ -10,20 +25,27 @@ export default function Room() {
   const [hand, setHand] = useState([])
   const [played, setPlayed] = useState([])
   const [name, setName] = useState('Player')
+  const [token, setToken] = useState('')
   const [status, setStatus] = useState('connecting')
   const [current, setCurrent] = useState(null)
   const [winner, setWinner] = useState(null)
   const [finished, setFinished] = useState([])
   const [bhabi, setBhabi] = useState(null)
   const [invalid, setInvalid] = useState(null)
+  const [mode, setMode] = useState('casual')
+  const [tournamentName, setTournamentName] = useState(null)
+  const [maxPlayers, setMaxPlayers] = useState(null)
+  const [standings, setStandings] = useState([])
 
   useEffect(() => {
     if (!id) return
     const s = getSocket()
     const params = new URLSearchParams(window.location.search)
     const playerName = params.get('name') || 'Player'
+    const playerToken = params.get('token') || window.localStorage.getItem('taash_token') || ''
     setName(playerName)
-    s.emit('joinRoom', { roomId: id, name: playerName })
+    setToken(playerToken)
+    s.emit('joinRoom', { roomId: id, name: playerName, token: playerToken })
 
     s.on('room:update', (room)=>{
       setPlayers(room.players || [])
@@ -34,6 +56,10 @@ export default function Room() {
       setFinished(room.finishedOrder || [])
       setBhabi(room.bhabi || null)
       setWinner(room.winner || room.bhabi || null)
+      setMode(room.mode || 'casual')
+      setTournamentName(room.tournamentName || null)
+      setMaxPlayers(room.maxPlayers || null)
+      setStandings(room.standings || [])
     })
 
     s.on('invalidPlay', ({ reason })=>{
@@ -67,8 +93,11 @@ export default function Room() {
       )}
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl">Room {id}</h2>
-          <div>{status} — {players.length} players</div>
+          <div>
+            <h2 className="text-2xl">{mode === 'tournament' ? tournamentName || 'Tournament' : 'Room'} {id}</h2>
+            <div className="text-sm text-slate-400">{status} — {players.length}{maxPlayers ? `/${maxPlayers}` : ''} players</div>
+          </div>
+          <div>{token ? 'Signed in' : 'Guest'}</div>
         </div>
 
         <div className="card mb-4">
@@ -99,11 +128,32 @@ export default function Room() {
           )}
         </div>
 
+        {mode === 'tournament' && (
+          <div className="card mb-4">
+            <div className="font-semibold">Tournament Ranking</div>
+            <div className="mt-2 space-y-2">
+              {standings.length === 0 && <div className="text-slate-400">No rankings yet</div>}
+              {standings.map((entry, index) => (
+                <div key={entry.username} className="flex justify-between rounded-lg bg-slate-950/60 p-3 border border-white/10">
+                  <div>
+                    <div className="font-semibold">#{index + 1} {entry.username}</div>
+                    <div className="text-xs text-slate-400">Games: {entry.gamesPlayed}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-orange-300">Wins {entry.wins}</div>
+                    <div className="text-slate-400 text-xs">Points {entry.tournamentPoints}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="card">
           <div className="font-semibold mb-2">Your Hand</div>
           <div className="flex gap-2 flex-wrap">
             {hand.length===0 && <div className="text-slate-400">No cards yet</div>}
-            {hand.map((c,i)=>(
+            {sortHand(hand).map((c,i)=>(
               <Card key={i} card={c} onPlay={playCard} disabled={current!==name} />
             ))}
           </div>

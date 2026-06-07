@@ -2,6 +2,7 @@ const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
 const cors = require('cors')
+const crypto = require('crypto')
 
 const app = express()
 app.use(cors())
@@ -32,43 +33,237 @@ setupRedisAdapter()
 
 // Simple in-memory rooms
 const rooms = {}
+const users = {}
+const tournaments = {}
+const tokens = {}
 
 function makeId() { return Math.random().toString(36).slice(2,8) }
+function makeToken() { return crypto.randomUUID() }
+
+function createEmptyRoom({ mode = 'casual', maxPlayers = 8, tournamentName = null, host = null } = {}){
+  return {
+    players: [],
+    hands: {},
+    played: [],
+    deck: [],
+    started: false,
+    current: 0,
+    mode,
+    maxPlayers,
+    tournamentName,
+    host,
+    tournament: tournamentName ? { name: tournamentName, standings: {}, rounds: 0 } : null,
+  }
+}
+
+function getAccountFromToken(token){
+  if (!token) return null
+  const username = tokens[token]
+  return username ? users[username] : null
+}
+
+function upsertAccount(username, password){
+  const existing = users[username]
+  if (existing){
+    if (existing.password !== password) return null
+    return existing
+  }
+  const account = {
+    username,
+    password,
+    wins: 0,
+    gamesPlayed: 0,
+    tournamentWins: 0,
+    tournamentPoints: 0,
+  }
+  users[username] = account
+  return account
+}
+
+function serializeAccount(account){
+  if (!account) return null
+  const { password, ...safe } = account
+  return safe
+}
+
+function compareLeaderboard(left, right){
+  if (right.wins !== left.wins) return right.wins - left.wins
+  if (right.tournamentPoints !== left.tournamentPoints) return right.tournamentPoints - left.tournamentPoints
+  if (right.tournamentWins !== left.tournamentWins) return right.tournamentWins - left.tournamentWins
+  return left.username.localeCompare(right.username)
+}
+
+function getLeaderboard(){
+  return Object.values(users)
+    .map(serializeAccount)
+    .sort(compareLeaderboard)
+}
+
+function ensureRoom(roomId, options = {}){
+  if (!rooms[roomId]) rooms[roomId] = createEmptyRoom(options)
+  return rooms[roomId]
+}
+
+function getRoomSummary(room){
+  const standings = room.tournament
+    ? Object.entries(room.tournament.standings).map(([username, stats]) => ({
+        username,
+        wins: stats.wins,
+        tournamentPoints: stats.points,
+        tournamentWins: stats.wins,
+        gamesPlayed: stats.gamesPlayed,
+      })).sort(compareLeaderboard)
+    : []
+  return {
+    ...room,
+    standings,
+  }
+}
+
+function recordFinishedRoom(room){
+  const rankings = [...(room.finishedOrder || [])]
+  if (room.bhabi) rankings.push(room.bhabi)
+
+  if (room.tournament){
+    room.tournament.rounds += 1
+    const totalPlayers = rankings.length || room.players.length
+    rankings.forEach((username, index)=>{
+      const points = Math.max(totalPlayers - index - 1, 0)
+      if (!room.tournament.standings[username]) {
+        room.tournament.standings[username] = { wins: 0, points: 0, gamesPlayed: 0 }
+      }
+      room.tournament.standings[username].gamesPlayed += 1
+      room.tournament.standings[username].points += points
+      if (index < rankings.length - 1) room.tournament.standings[username].wins += 1
+
+      const account = users[username]
+      if (account){
+        account.gamesPlayed += 1
+        account.tournamentPoints += points
+        if (index < rankings.length - 1) {
+          account.wins += 1
+          account.tournamentWins += 1
+        }
+      }
+    })
+  } else {
+    const winnerSet = new Set(room.finishedOrder || [])
+    room.players.forEach(player => {
+      const account = users[player.name]
+      if (account) {
+        account.gamesPlayed += 1
+        if (winnerSet.has(player.name)) account.wins += 1
+      }
+    })
+  }
+}
 
 const { createDeck, shuffle, dealRoundRobin } = require('./game')
 
 app.get('/rooms', (req,res)=>{
-  const output = Object.keys(rooms).map(id=>({ id, players: rooms[id].players.map(p=>({ name:p.name })) }))
+  const output = Object.keys(rooms).map(id=>({ id, ...getRoomSummary(rooms[id]), players: rooms[id].players.map(p=>({ name:p.name })) }))
   res.json(output)
 })
 
 app.post('/rooms', (req,res)=>{
   const id = makeId()
-  rooms[id] = { players: [], hands: {}, played: [], deck: [], started: false, current: 0 }
+  rooms[id] = createEmptyRoom()
   console.log('Created room', id)
   res.json({ id })
+})
+
+app.post('/tournaments', (req,res)=>{
+  const { name, maxPlayers, token, hostName } = req.body || {}
+  const account = getAccountFromToken(token)
+  const tournamentName = (name || 'Tournament').trim()
+  const limit = Number(maxPlayers)
+  if (!Number.isInteger(limit) || limit < 2 || limit > 12) {
+    return res.status(400).json({ error: 'maxPlayers must be between 2 and 12' })
+  }
+  const roomId = makeId()
+  const host = account?.username || hostName || 'Host'
+  rooms[roomId] = createEmptyRoom({ mode: 'tournament', maxPlayers: limit, tournamentName, host })
+  tournaments[roomId] = { id: roomId, name: tournamentName, maxPlayers: limit, host, roomId }
+  res.json({ id: roomId, name: tournamentName, maxPlayers: limit, host })
+})
+
+app.get('/tournaments', (req,res)=>{
+  const output = Object.entries(rooms)
+    .filter(([, room]) => room.mode === 'tournament')
+    .map(([id, room]) => ({ id, ...getRoomSummary(room) }))
+  res.json(output)
+})
+
+app.get('/tournaments/:id', (req,res)=>{
+  const room = rooms[req.params.id]
+  if (!room || room.mode !== 'tournament') return res.status(404).json({ error: 'Tournament not found' })
+  res.json({ id: req.params.id, ...getRoomSummary(room) })
+})
+
+app.post('/auth/register', (req,res)=>{
+  const { username, password } = req.body || {}
+  const cleanUsername = (username || '').trim()
+  if (!cleanUsername || !password) return res.status(400).json({ error: 'username and password are required' })
+  if (users[cleanUsername]) return res.status(409).json({ error: 'Username already exists' })
+  const account = upsertAccount(cleanUsername, password)
+  const token = makeToken()
+  tokens[token] = cleanUsername
+  res.json({ token, user: serializeAccount(account) })
+})
+
+app.post('/auth/login', (req,res)=>{
+  const { username, password } = req.body || {}
+  const cleanUsername = (username || '').trim()
+  const account = upsertAccount(cleanUsername, password)
+  if (!account) return res.status(401).json({ error: 'Invalid username or password' })
+  const token = makeToken()
+  tokens[token] = cleanUsername
+  res.json({ token, user: serializeAccount(account) })
+})
+
+app.get('/me', (req,res)=>{
+  const auth = req.headers.authorization || ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : req.query.token
+  const account = getAccountFromToken(token)
+  if (!account) return res.status(401).json({ error: 'Not authenticated' })
+  res.json({ user: serializeAccount(account) })
+})
+
+app.get('/leaderboard', (req,res)=>{
+  res.json({ users: getLeaderboard() })
 })
 
 io.on('connection', (socket)=>{
   console.log('socket connected', socket.id)
 
   socket.on('listRooms', ()=>{
-    const out = Object.keys(rooms).map(id=>({ id, players: rooms[id].players }))
+    const out = Object.entries(rooms).map(([id, room])=>({
+      id,
+      mode: room.mode,
+      maxPlayers: room.maxPlayers,
+      started: room.started,
+      tournamentName: room.tournamentName,
+      players: room.players.map(p=>({ name: p.name })),
+      standings: getRoomSummary(room).standings,
+    }))
     socket.emit('rooms', out)
   })
 
-  socket.on('joinRoom', ({ roomId, name })=>{
-    if (!rooms[roomId]) rooms[roomId] = { players: [], hands: {}, played: [], deck: [], started: false, current: 0 }
-    const room = rooms[roomId]
-    const player = { id: socket.id, name, count: 0 }
+  socket.on('joinRoom', ({ roomId, name, token })=>{
+    const account = getAccountFromToken(token)
+    const room = ensureRoom(roomId)
+    const playerName = account?.username || name
+    if (!playerName) return
+    if (room.mode === 'tournament' && room.players.length >= room.maxPlayers && !room.players.find(p=>p.name===playerName)) return
+    const player = { id: socket.id, name: playerName, count: 0 }
     // avoid duplicate
     if (!room.players.find(p=>p.id===socket.id)) room.players.push(player)
 
     socket.join(roomId)
-    socket.emit('joined', { roomId })
+    socket.emit('joined', { roomId, name: playerName })
 
     // emit update
-    io.to(roomId).emit('room:update', room)
+    io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
   })
 
   socket.on('startGame', ({ roomId })=>{
@@ -90,7 +285,7 @@ io.on('connection', (socket)=>{
     room.current = 0
     room.trick = { leadSuit: null, plays: [] }
     room.finishedOrder = []
-    io.to(roomId).emit('room:update', room)
+    io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
   })
 
   socket.on('playCard', ({ roomId, name, card })=>{
@@ -152,8 +347,15 @@ io.on('connection', (socket)=>{
         if (val>bestVal){ bestVal = val; winner = p.name }
       }
 
+      if (winner){
+        const pile = trick.plays.map(p=>p.card)
+        room.hands[winner] = (room.hands[winner] || []).concat(pile)
+      }
+
       // reset trick
       room.trick = { leadSuit: null, plays: [] }
+
+      room.players.forEach(p=> p.count = room.hands[p.name]?.length || 0)
 
       // set next current to winner index
       const widx = room.players.findIndex(p=>p.name===winner)
@@ -169,9 +371,10 @@ io.on('connection', (socket)=>{
       // if only one player left with cards -> Bhabi
       const remaining = room.players.filter(p=> (room.hands[p.name]||[]).length>0)
       if (remaining.length<=1){
-        room.started = false
         room.bhabi = remaining.length===1 ? remaining[0].name : null
-        io.to(roomId).emit('room:update', room)
+        recordFinishedRoom(room)
+        room.started = false
+        io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
         return
       }
     } else {
@@ -186,7 +389,7 @@ io.on('connection', (socket)=>{
       room.current = next
     }
 
-    io.to(roomId).emit('room:update', room)
+    io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
   })
 
   socket.on('disconnect', ()=>{
@@ -196,7 +399,7 @@ io.on('connection', (socket)=>{
       const idx = r.players.findIndex(p=>p.id===socket.id)
       if (idx>=0){
         r.players.splice(idx,1)
-        io.to(id).emit('room:update', r)
+        io.to(id).emit('room:update', { id, ...getRoomSummary(r) })
       }
     }
   })
