@@ -53,6 +53,9 @@ function createEmptyRoom({ mode = 'casual', maxPlayers = 8, tournamentName = nul
     tournamentName,
     host,
     tournament: tournamentName ? { name: tournamentName, standings: {}, rounds: 0 } : null,
+    trick: { leadSuit: null, plays: [] },
+    openingCard: null,
+    openingCardPlayed: false,
   }
 }
 
@@ -319,6 +322,7 @@ io.on('connection', (socket)=>{
     // enforce follow-suit
     const trick = room.trick || { leadSuit: null, plays: [] }
     const leadSuit = trick.leadSuit
+    let offSuitPlayed = false
     if (leadSuit){
       const hasLeadSuit = (room.hands[name]||[]).some(c=> suitOf(c) === leadSuit)
       if (hasLeadSuit && suitOf(card) !== leadSuit){
@@ -326,6 +330,7 @@ io.on('connection', (socket)=>{
         socket.emit('invalidPlay', { reason: 'Must follow suit', card })
         return
       }
+      if (suitOf(card) !== leadSuit) offSuitPlayed = true
     } else {
       // first play of trick sets leadSuit
       trick.leadSuit = suitOf(card)
@@ -338,56 +343,60 @@ io.on('connection', (socket)=>{
     room.trick = trick
     room.players.forEach(p=> p.count = room.hands[p.name]?.length || 0)
 
-    // determine number of active players (with cards)
-    const activePlayers = room.players.filter(p=> (room.hands[p.name]||[]).length>0 || p.name === name || trick.plays.some(x=>x.name===p.name))
-    // if trick complete: when plays by all players who had cards at trick start have played
-    const playersToPlay = room.players.filter(p=> (room.hands[p.name]||[]).length>0 || p.name===name || trick.plays.some(x=>x.name===p.name))
-
-    // We consider trick complete when plays.length equals number of players who had cards at trick start
-    // Simpler approach: assume number of plays equals number of players who are still in round (players with count>0 plus those who just played)
-    const playersStill = room.players.filter(p=> (room.hands[p.name]||[]).length>0 || trick.plays.some(x=>x.name===p.name))
-    const expectedPlays = playersStill.length
-
-    if (trick.plays.length >= expectedPlays){
-      // find winner: highest rank in leadSuit
+    const finalizeTrick = (shouldCollectPile) => {
+      const pile = trick.plays.map(p=>p.card)
       let winner = null
       let bestVal = -1
       for (const p of trick.plays){
         if (suitOf(p.card) !== trick.leadSuit) continue
         const val = rankValue(rankOf(p.card))
-        if (val>bestVal){ bestVal = val; winner = p.name }
+        if (val > bestVal){
+          bestVal = val
+          winner = p.name
+        }
       }
 
-      if (winner){
-        const pile = trick.plays.map(p=>p.card)
+      if (shouldCollectPile && winner){
         room.hands[winner] = (room.hands[winner] || []).concat(pile)
       }
 
-      // reset trick
       room.trick = { leadSuit: null, plays: [] }
-
       room.players.forEach(p=> p.count = room.hands[p.name]?.length || 0)
 
-      // set next current to winner index
       const widx = room.players.findIndex(p=>p.name===winner)
-      room.current = widx>=0 ? widx : room.current
+      room.current = widx >= 0 ? widx : room.current
 
-      // check finished order
       room.players.forEach(p=>{
         if ((room.hands[p.name]||[]).length===0 && !room.finishedOrder.includes(p.name)){
           room.finishedOrder.push(p.name)
         }
       })
 
-      // if only one player left with cards -> Bhabi
       const remaining = room.players.filter(p=> (room.hands[p.name]||[]).length>0)
       if (remaining.length<=1){
         room.bhabi = remaining.length===1 ? remaining[0].name : null
         recordFinishedRoom(room)
         room.started = false
         io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
-        return
+        return true
       }
+
+      return false
+    }
+
+    if (offSuitPlayed){
+      // Any off-suit card ends the trick immediately and the highest lead-suit card takes the pile.
+      const ended = finalizeTrick(true)
+      if (!ended) io.to(roomId).emit('room:update', { id: roomId, ...getRoomSummary(room) })
+      return
+    }
+
+    const playersWithCards = room.players.filter(p => (room.hands[p.name] || []).length > 0)
+    const trickComplete = trick.plays.length >= playersWithCards.length || room.players.every(p => trick.plays.some(x => x.name === p.name) || (room.hands[p.name] || []).length === 0)
+
+    if (trickComplete){
+      // If everyone followed the lead suit, discard the pile and let the highest lead-suit card start the next trick.
+      finalizeTrick(false)
     } else {
       // advance to next player who has cards and hasn't played this trick
       let next = (room.current+1) % room.players.length
